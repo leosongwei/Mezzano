@@ -165,6 +165,7 @@
   (mezzano.supervisor:make-thread
    (lambda () (sound-worker device))
    :name (format nil "Sound worker for ~S" device)
+   :is-driver t
    :priority :high))
 
 (defgeneric transcode (audio-format audio-buffer data-buffer &key (start1 0) end1 (start2 0) end2))

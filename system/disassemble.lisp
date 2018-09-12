@@ -156,6 +156,7 @@
     (#.mezzano.supervisor::+thread-global-next+ "thread-global-next")
     (#.mezzano.supervisor::+thread-global-prev+ "thread-global-prev")
     (#.mezzano.supervisor::+thread-priority+ "thread-priority")
+    (#.mezzano.supervisor::+thread-priority+ "thread-is-driver")
     (#.mezzano.supervisor::+thread-pager-argument-1+ "thread-pager-argument-1")
     (#.mezzano.supervisor::+thread-pager-argument-2+ "thread-pager-argument-2")
     (#.mezzano.supervisor::+thread-pager-argument-3+ "thread-pager-argument-3")

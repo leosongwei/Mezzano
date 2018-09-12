@@ -300,7 +300,8 @@ and then some alignment.")
     (setf (virtio-net-worker-thread nic)
           (sup:make-thread (lambda ()
                              (virtio-net-worker nic))
-                           :name "Virtio-Net NIC worker")))
+                           :name "Virtio-Net NIC worker"
+                           :is-driver t)))
   t)
 
 (defun virtio-net-worker (nic)

@@ -122,7 +122,9 @@
   (field unsleep-helper 24)
   ;; Argument for the unsleep helper.
   (field unsleep-helper-argument 25)
-  ;; 26-32 - free
+  ;; Is a driver?
+  (field is-driver 26 :type boolean)
+  ;; 27-32 - free
   ;; 32-127 MV slots
   ;;    Slots used as part of the multiple-value return convention.
   ;;    Note! The compiler must be updated if this changes and all code rebuilt.
@@ -372,11 +374,12 @@ Interrupts must be off and the global thread lock must be held."
 
 ;;; Stuff.
 
-(defun make-thread (function &key name initial-bindings (stack-size *default-stack-size*) (priority :normal))
+(defun make-thread (function &key name initial-bindings (stack-size *default-stack-size*) (priority :normal) (is-driver nil))
   (declare (sys.c::closure-allocation :wired))
   (check-type name (or null string))
   (check-type function (or function symbol))
   (check-type priority (member :supervisor :high :normal :low))
+  (check-type is-driver boolean)
   (when name
     (setf name (mezzano.runtime::copy-string-in-area name :wired)))
   ;; Allocate-object will leave the thread's state variable initialized to 0.
@@ -392,6 +395,7 @@ Interrupts must be off and the global thread lock must be held."
           (sys.int::%object-ref-t thread +thread-pending-footholds+) '()
           (sys.int::%object-ref-t thread +thread-inhibit-footholds+) 1
           (sys.int::%object-ref-t thread +thread-priority+) priority
+          (sys.int::%object-ref-t thread +thread-is-driver+) is-driver
           (sys.int::%object-ref-t thread +thread-pager-argument-1+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-2+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-3+) nil)
