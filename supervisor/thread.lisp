@@ -467,6 +467,7 @@ Interrupts must be off and the global thread lock must be held."
           (sys.int::%object-ref-t thread +thread-pending-footholds+) '()
           (sys.int::%object-ref-t thread +thread-inhibit-footholds+) 1
           (sys.int::%object-ref-t thread +thread-priority+) priority
+          (sys.int::%object-ref-t thread +thread-is-driver+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-1+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-2+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-3+) nil)

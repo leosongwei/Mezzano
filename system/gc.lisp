@@ -874,6 +874,7 @@ This is required to make the GC interrupt safe."
   (scavengef (mezzano.supervisor:thread-pager-argument-3 object) cycle-kind)
   (scavengef (mezzano.supervisor:thread-unsleep-helper object) cycle-kind)
   (scavengef (mezzano.supervisor:thread-unsleep-helper-argument object) cycle-kind)
+  (scavengef (mezzano.supervisor:thread-is-driver object) cycle-kind)
   ;; Scavenge the binding cache to prevent stale symbol value cells from
   ;; being reused.
   (loop
