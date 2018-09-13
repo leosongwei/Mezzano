@@ -123,7 +123,7 @@
   ;; Argument for the unsleep helper.
   (field unsleep-helper-argument 25)
   ;; Is a driver?
-  (field is-driver 26 :type boolean)
+  (field is-driver 26)
   ;; 27-32 - free
   ;; 32-127 MV slots
   ;;    Slots used as part of the multiple-value return convention.
@@ -395,7 +395,7 @@ Interrupts must be off and the global thread lock must be held."
           (sys.int::%object-ref-t thread +thread-pending-footholds+) '()
           (sys.int::%object-ref-t thread +thread-inhibit-footholds+) 1
           (sys.int::%object-ref-t thread +thread-priority+) priority
-          (sys.int::%object-ref-t thread +thread-is-driver+) is-driver
+          (sys.int::%object-ref-t thread +thread-is-driver+) (if is-driver 1 0)
           (sys.int::%object-ref-t thread +thread-pager-argument-1+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-2+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-3+) nil)
@@ -467,7 +467,7 @@ Interrupts must be off and the global thread lock must be held."
           (sys.int::%object-ref-t thread +thread-pending-footholds+) '()
           (sys.int::%object-ref-t thread +thread-inhibit-footholds+) 1
           (sys.int::%object-ref-t thread +thread-priority+) priority
-          (sys.int::%object-ref-t thread +thread-is-driver+) nil
+          (sys.int::%object-ref-t thread +thread-is-driver+) 0
           (sys.int::%object-ref-t thread +thread-pager-argument-1+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-2+) nil
           (sys.int::%object-ref-t thread +thread-pager-argument-3+) nil)
@@ -724,7 +724,7 @@ Interrupts must be off and the global thread lock must be held."
 (defun terminate-driver-threads ()
   (do ((thread *all-threads* (thread-global-next thread)))
     ((null thread))
-    (if (thread-is-driver thread)
+    (if (= 1 (thread-is-driver thread))
       (progn (debug-print-line "Terminate driver: " (thread-name thread))
              (terminate-thread thread)))))
 
