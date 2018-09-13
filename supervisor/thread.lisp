@@ -712,7 +712,7 @@ Interrupts must be off and the global thread lock must be held."
   (debug-print-line "===========================================================")
   (do ((thread *all-threads* (thread-global-next thread)))
     ((null thread))
-    (debug-print-line "Thread:" (thread-name thread)))
+    (debug-print-line "Thread: " (thread-name thread) "is-driver: " (thread-is-driver thread)))
   (debug-print-line "==========================================================="))
 
 (defun terminate-thread (thread)
