@@ -721,6 +721,12 @@ Interrupts must be off and the global thread lock must be held."
    (lambda ()
      (throw 'terminate-thread nil))))
 
+(defun terminate-driver-threads ()
+  (do ((thread *all-threads* (thread-global-next thread)))
+    ((null thread))
+    (if (eq :driver (thread-is-driver thread))
+      (terminate-thread thread))))
+
 (defmacro dx-lambda (lambda-list &body body)
   `(flet ((dx-lambda ,lambda-list ,@body))
      (declare (dynamic-extent #'dx-lambda))

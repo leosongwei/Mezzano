@@ -158,6 +158,8 @@
     ;;(debug-set-output-pseudostream (lambda (op &optional arg) (declare (ignore op arg))))
     (debug-print-line "Hello, Debug World!")
 
+    (terminate-driver-threads)
+
     (debug-print-line "Interrupts enabled.")
     (debug-print-all-threads)
 
