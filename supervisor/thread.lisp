@@ -708,6 +708,13 @@ Interrupts must be off and the global thread lock must be held."
        list)
     (push current list)))
 
+(defun debug-print-all-threads ()
+  (debug-print-line "===========================================================")
+  (do ((thread *all-threads* (thread-global-next thread)))
+    ((null thread))
+    (debug-print-line "Thread:" (thread-name thread)))
+  (debug-print-line "==========================================================="))
+
 (defun terminate-thread (thread)
   (establish-thread-foothold
    thread

@@ -157,6 +157,10 @@
     ;;(debug-set-output-pseudostream #'debug-video-stream)
     ;;(debug-set-output-pseudostream (lambda (op &optional arg) (declare (ignore op arg))))
     (debug-print-line "Hello, Debug World!")
+
+    (debug-print-line "Interrupts enabled.")
+    (debug-print-all-threads)
+
     (initialize-time)
     (initialize-video)
     (when (boot-option +boot-option-video-console+)
@@ -166,9 +170,17 @@
     (initialize-virtio)
     (initialize-platform)
     (initialize-time-late)
+
+    (debug-print-line "Drivers enabled.")
+    (debug-print-all-threads)
+
     (when (not (boot-option +boot-option-no-detect+))
       (detect-disk-partitions))
     (initialize-paging-system)
+
+    (debug-print-line "Paging system enabled.")
+    (debug-print-all-threads)
+
     ;; Disabled, SMP is more broken than normal.
     ;;(boot-secondary-cpus)
     (cond (first-run-p
