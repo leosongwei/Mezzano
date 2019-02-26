@@ -5,10 +5,11 @@
 
 (sys.int::defglobal *global-thread-lock* nil
   "This lock protects the special variables that make up the thread list/run queues and the thread objects.")
+
 (sys.int::defglobal *supervisor-priority-run-queue*)
-(sys.int::defglobal *high-priority-run-queue*)
-(sys.int::defglobal *normal-priority-run-queue*)
-(sys.int::defglobal *low-priority-run-queue*)
+(sys.int::defglobal *run-queue-array*)
+(defconstant +priority-levels+ 10)
+
 (sys.int::defglobal *all-threads*)
 (sys.int::defglobal *n-running-cpus*)
 
@@ -90,6 +91,9 @@
   ;; Thread's priority, can be :supervisor, :high, :normal, or :low.
   ;; Threads at :supervisor have priority over all other threads.
   (priority :normal :type (member :low :normal :high :supervisor :idle))
+  ;; Specify the current priority queue
+  (current-priority 0)
+  (time-slice-number 1)
   ;; Arguments passed to the pager when performing an RPC.
   pager-argument-1
   pager-argument-2
@@ -198,12 +202,18 @@
 
 ;;; Run queue management.
 
+(defun priority-queue-index (priority)
+  (ecase priority
+    (:high 0)
+    (:normal 4)
+    (:low 8)))
+
 (defun run-queue-for-priority (priority)
   (ecase priority
     (:supervisor *supervisor-priority-run-queue*)
-    (:high *high-priority-run-queue*)
-    (:normal *normal-priority-run-queue*)
-    (:low *low-priority-run-queue*)))
+    (:high (aref *run-queue-array* (priority-queue-index :high)))
+    (:normal (aref *run-queue-array* (priority-queue-index :normal)))
+    (:low (aref *run-queue-array* (priority-queue-index :low)))))
 
 (defun push-run-queue-1 (thread rq)
   (cond ((null (run-queue-head rq))
@@ -221,6 +231,7 @@
   (ensure-global-thread-lock-held)
   (when (eql thread *world-stopper*)
     (return-from push-run-queue))
+  (setf (thread-time-slice-number thread) 1)
   (push-run-queue-1 thread (run-queue-for-priority (thread-priority thread))))
 
 (defun pop-run-queue-1 (rq)
@@ -236,9 +247,11 @@
 
 (defun pop-run-queue ()
   (or (pop-run-queue-1 *supervisor-priority-run-queue*)
-      (pop-run-queue-1 *high-priority-run-queue*)
-      (pop-run-queue-1 *normal-priority-run-queue*)
-      (pop-run-queue-1 *low-priority-run-queue*)))
+      (let (thread)
+        (dotimes (i +priority-levels+)
+          (setf thread (pop-run-queue-1 (aref *run-queue-array* i)))
+          (if thread (return)))
+        thread)))
 
 (defun dump-run-queue (rq)
   (debug-print-line "Run queue " rq "/" (run-queue-name rq) ":")
@@ -250,11 +263,20 @@
   (debug-print-line "Run queues:")
   (when *world-stopper*
     (debug-print-line "Thread " *world-stopper* " holds the world"))
-  (when (boundp '*normal-priority-run-queue*)
-    (dump-run-queue *supervisor-priority-run-queue*)
-    (dump-run-queue *high-priority-run-queue*)
-    (dump-run-queue *normal-priority-run-queue*)
-    (dump-run-queue *low-priority-run-queue*)))
+  (when (boundp '*run-queue-array*)
+    (dotimes (i +priority-levels+)
+      (dump-run-queue (aref *run-queue-array* i))))
+
+(defun punishment-thread (thread)
+  (let* ((priority-original (priority-queue-index (thread-priority current)))
+         (priority-current (thread-current-priority current))
+         (priority-new (if (= priority-current (1- +priority-levels+))
+                           priority-current
+                           (1+ priority-current)))
+         (next-run-queue (aref *run-queue-array* priority-new)))
+    (setf (thread-current-priority thread) priority-new
+          (thread-time-slice-number thread) (+ 1 (- priority-new priority-original)))
+    (push-run-queue-1 thread next-run-queue)))
 
 (defun %update-run-queue ()
   "Possibly return the current thread to the run queue, and
@@ -264,10 +286,6 @@ Interrupts must be off and the global thread lock must be held."
   (let ((current (current-thread)))
     (when (eql current (local-cpu-idle-thread))
       (panic "Aiee. Idle thread called %UPDATE-RUN-QUEUE."))
-    ;; Return the current thread to the run queue and fetch the next thread.
-    (when (and (not (eql current *world-stopper*))
-               (eql (thread-state current) :runnable))
-      (push-run-queue current))
     (cond (*world-stopper*
            ;; World is stopped, the only runnable threads are the world stopper
            ;; or any thread at :supervisor priority.
@@ -279,11 +297,16 @@ Interrupts must be off and the global thread lock must be held."
                  (t ;; Switch to idle.
                   (local-cpu-idle-thread))))
           (t
-           (or
-            ;; Try taking from the run queue.
-            (pop-run-queue)
-            ;; Fall back on idle.
-            (local-cpu-idle-thread))))))
+           (or (if (eql (thread-state current) :runnable)
+                   (if (> (thread-time-slice-number current) 0)
+                       (progn (decf (thread-time-slice-number current))
+                              current)
+                       ;; Punish current thread for time slices used out
+                       ;; and try taking from the run queue.
+                       (progn (punishment-thread current)
+                              (pop-run-queue))))
+               ;; Fall back on idle.
+               (local-cpu-idle-thread))))))
 
 ;;; Thread switching.
 
@@ -388,7 +411,8 @@ Interrupts must be off and the global thread lock must be held."
          (stack (%allocate-stack stack-size)))
     (setf (thread-stack thread) stack
           (thread-self thread) thread
-          (thread-priority thread) priority)
+          (thread-priority thread) priority
+          (thread-current-priority thread) (priority-queue-index priority))
     ;; Perform initial bindings.
     (when initial-bindings
       (let ((symbols (mapcar #'first initial-bindings))
@@ -593,10 +617,10 @@ Interrupts must be off and the global thread lock must be held."
   (when (not (boundp '*global-thread-lock*))
     ;; First-run stuff.
     (setf *global-thread-lock* :unlocked)
-    (setf *supervisor-priority-run-queue* (make-run-queue :supervisor)
-          *high-priority-run-queue* (make-run-queue :high)
-          *normal-priority-run-queue* (make-run-queue :normal)
-          *low-priority-run-queue* (make-run-queue :low))
+    (setf *supervisor-priority-run-queue* (make-run-queue :supervisor))
+    (setf *run-queue-array* (sys.int::make-simple-vector +priority-levels+ :wired))
+    (dotimes (i +priority-levels+)
+      (setf (aref *run-queue-array* i) (make-run-queue :priority)))
     (setf *world-stop-lock* (make-mutex "World stop lock")
           *world-stop-cvar* (make-condition-variable "World stop cvar")
           *world-stop-pending* nil
