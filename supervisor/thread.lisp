@@ -211,9 +211,9 @@
 (defun run-queue-for-priority (priority)
   (ecase priority
     (:supervisor *supervisor-priority-run-queue*)
-    (:high (aref *run-queue-array* (priority-queue-index :high)))
-    (:normal (aref *run-queue-array* (priority-queue-index :normal)))
-    (:low (aref *run-queue-array* (priority-queue-index :low)))))
+    (:high (svref *run-queue-array* (priority-queue-index :high)))
+    (:normal (svref *run-queue-array* (priority-queue-index :normal)))
+    (:low (svref *run-queue-array* (priority-queue-index :low)))))
 
 (defun push-run-queue-1 (thread rq)
   (cond ((null (run-queue-head rq))
@@ -249,7 +249,7 @@
   (or (pop-run-queue-1 *supervisor-priority-run-queue*)
       (let (thread)
         (dotimes (i +priority-levels+)
-          (setf thread (pop-run-queue-1 (aref *run-queue-array* i)))
+          (setf thread (pop-run-queue-1 (svref *run-queue-array* i)))
           (if thread (return)))
         thread)))
 
@@ -265,15 +265,15 @@
     (debug-print-line "Thread " *world-stopper* " holds the world"))
   (when (boundp '*run-queue-array*)
     (dotimes (i +priority-levels+)
-      (dump-run-queue (aref *run-queue-array* i))))
+      (dump-run-queue (svref *run-queue-array* i)))))
 
 (defun punishment-thread (thread)
-  (let* ((priority-original (priority-queue-index (thread-priority current)))
-         (priority-current (thread-current-priority current))
+  (let* ((priority-original (priority-queue-index (thread-priority thread)))
+         (priority-current (thread-current-priority thread))
          (priority-new (if (= priority-current (1- +priority-levels+))
                            priority-current
                            (1+ priority-current)))
-         (next-run-queue (aref *run-queue-array* priority-new)))
+         (next-run-queue (svref *run-queue-array* priority-new)))
     (setf (thread-current-priority thread) priority-new
           (thread-time-slice-number thread) (+ 1 (- priority-new priority-original)))
     (push-run-queue-1 thread next-run-queue)))
@@ -620,7 +620,7 @@ Interrupts must be off and the global thread lock must be held."
     (setf *supervisor-priority-run-queue* (make-run-queue :supervisor))
     (setf *run-queue-array* (sys.int::make-simple-vector +priority-levels+ :wired))
     (dotimes (i +priority-levels+)
-      (setf (aref *run-queue-array* i) (make-run-queue :priority)))
+      (setf (svref *run-queue-array* i) (make-run-queue :priority)))
     (setf *world-stop-lock* (make-mutex "World stop lock")
           *world-stop-cvar* (make-condition-variable "World stop cvar")
           *world-stop-pending* nil
